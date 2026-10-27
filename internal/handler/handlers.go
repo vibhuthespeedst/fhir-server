@@ -731,7 +731,12 @@ func (h *fhirHandler) create(w http.ResponseWriter, r *http.Request) {
 	// Conditional create (If-None-Exist): create only if no existing resource
 	// matches the query. One match → return it (200, no create); many → 412.
 	if ifne := strings.TrimSpace(r.Header.Get("If-None-Exist")); ifne != "" {
-		existingID, count, err := h.store.ConditionalMatch(r.Context(), rt, ifne)
+		query, err := store.IfNoneExistQuery(ifne)
+		if err != nil {
+			operationOutcome(w, http.StatusBadRequest, "error", "invalid", err.Error())
+			return
+		}
+		existingID, count, err := h.store.ConditionalMatch(r.Context(), rt, query)
 		if err != nil {
 			slog.Error("conditional create match failed", "resourceType", rt, "err", err)
 			operationOutcome(w, http.StatusInternalServerError, "error", "exception", "conditional match failed")

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -446,7 +447,11 @@ func (s *Store) planOps(ctx context.Context, baseURL string, entries []BundleEnt
 			}
 			// Conditional create (If-None-Exist): reuse an existing match if present.
 			if e.IfNoneExist != "" {
-				existingID, count, serr := s.conditionalMatch(ctx, rt, e.IfNoneExist)
+				query, qerr := IfNoneExistQuery(e.IfNoneExist)
+				if qerr != nil {
+					return nil, nil, &BundleError{HTTPStatus: 400, Code: "invalid", EntryIndex: i, Diagnostics: qerr.Error()}
+				}
+				existingID, count, serr := s.conditionalMatch(ctx, rt, query)
 				if serr != nil {
 					return nil, nil, &BundleError{HTTPStatus: 500, Code: "exception", EntryIndex: i, Diagnostics: serr.Error()}
 				}
@@ -578,6 +583,31 @@ func (s *Store) conditionalMatch(ctx context.Context, resourceType, rawQuery str
 		id, _ = result.Entries[0]["id"].(string)
 	}
 	return id, count, nil
+}
+
+// IfNoneExistQuery returns the query of an If-None-Exist value. The spec form
+// is the bare query, but some clients send "?query", "Type?query" or a full
+// search URL, so anything up to the "?" is dropped. A value without criteria,
+// or with a parameter that has no value, is an error: it would match nothing
+// and turn the conditional create into a plain create.
+func IfNoneExistQuery(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if before, after, found := strings.Cut(value, "?"); found && !strings.Contains(before, "=") {
+		value = after
+	}
+	q, err := url.ParseQuery(value)
+	if err != nil {
+		return "", fmt.Errorf("invalid If-None-Exist %q: %v", value, err)
+	}
+	if len(q) == 0 {
+		return "", fmt.Errorf("If-None-Exist has no search criteria")
+	}
+	for key, vals := range q {
+		if slices.Contains(vals, "") {
+			return "", fmt.Errorf("If-None-Exist parameter %q has no value", key)
+		}
+	}
+	return value, nil
 }
 
 // ─── URL / reference helpers ───────────────────────────────────────────────────
