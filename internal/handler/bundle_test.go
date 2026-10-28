@@ -302,6 +302,31 @@ func TestBundle_RejectsBadType(t *testing.T) {
 	}
 }
 
+func TestBundle_RejectsEmptyIfNoneExist(t *testing.T) {
+	called := false
+	ms := &mockStore{
+		executeBundleFn: func(_ context.Context, _, _ string, entries []store.BundleEntryRequest) ([]store.BundleEntryResult, error) {
+			called = true
+			return make([]store.BundleEntryResult, len(entries)), nil
+		},
+	}
+	h := newRouter(ms)
+	resp := do(t, h, http.MethodPost, "/fhir/r4", map[string]any{
+		"resourceType": "Bundle",
+		"type":         "transaction",
+		"entry": []any{map[string]any{
+			"resource": map[string]any{"resourceType": "Patient"},
+			"request":  map[string]any{"method": "POST", "url": "Patient", "ifNoneExist": ""},
+		}},
+	})
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", resp.Code, resp.Body.String())
+	}
+	if called {
+		t.Error("ExecuteBundle must not run for an empty ifNoneExist")
+	}
+}
+
 func TestBundle_TransactionErrorMapsStatus(t *testing.T) {
 	ms := &mockStore{
 		executeBundleFn: func(_ context.Context, _, _ string, _ []store.BundleEntryRequest) ([]store.BundleEntryResult, error) {

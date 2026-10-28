@@ -234,6 +234,11 @@ func parseBundleEntries(bundle map[string]any) ([]store.BundleEntryRequest, stri
 		if method == "" || url == "" {
 			return nil, fmt.Sprintf("entry[%d].request.method and request.url are required", i)
 		}
+		// An empty ifNoneExist is not a missing one: like a blank If-None-Exist
+		// header, it must not turn into a plain create.
+		if s, ok := req["ifNoneExist"].(string); ok && strings.TrimSpace(s) == "" {
+			return nil, fmt.Sprintf("entry[%d].request.ifNoneExist has no search criteria", i)
+		}
 
 		entry := store.BundleEntryRequest{
 			Method:      method,
