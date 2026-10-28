@@ -585,13 +585,18 @@ func (s *Store) conditionalMatch(ctx context.Context, resourceType, rawQuery str
 	return id, count, nil
 }
 
+// controlParams add no predicate in applyParam (_sort only orders), so a query
+// made of nothing else matches every resource of the type.
+var controlParams = []string{"_count", "_page", "_sort", "_include", "_revinclude", "_format", "_summary", "_elements", "_total", "_list"}
+
 // IfNoneExistQuery returns the query of an If-None-Exist value. The spec form
 // is the bare query, but some clients send "?query", "Type?query" or a full
 // search URL, so anything up to the "?" is dropped. When the text before the
 // "?" starts with "name=", the "?" is part of a value instead, unless the name
 // has a "/" (a URL whose path holds an "="). A value without criteria,
 // or with a parameter that has no value, is an error: it would match nothing
-// and turn the conditional create into a plain create.
+// and turn the conditional create into a plain create. Control params like
+// _count are not criteria.
 func IfNoneExistQuery(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	before, after, found := strings.Cut(value, "?")
@@ -602,13 +607,16 @@ func IfNoneExistQuery(value string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid If-None-Exist %q: %v", value, err)
 	}
-	if len(q) == 0 {
-		return "", fmt.Errorf("If-None-Exist has no search criteria")
-	}
+	criteria := false
 	for key, vals := range q {
 		if slices.Contains(vals, "") {
 			return "", fmt.Errorf("If-None-Exist parameter %q has no value", key)
 		}
+		name, _, _ := strings.Cut(key, ":")
+		criteria = criteria || !slices.Contains(controlParams, name)
+	}
+	if !criteria {
+		return "", fmt.Errorf("If-None-Exist has no search criteria")
 	}
 	return value, nil
 }

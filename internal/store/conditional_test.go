@@ -31,13 +31,13 @@ func TestIfNoneExistQuery(t *testing.T) {
 		}
 	}
 
-	// A "?" inside a value is not a prefix.
-	const kept = "identifier=urn:x|a?b"
+	// A "?" inside a value is not a prefix, and _count next to a criterion is fine.
+	const kept = "identifier=urn:x|a?b&_count=1"
 	if got, err := IfNoneExistQuery(kept); err != nil || got != kept {
 		t.Errorf("IfNoneExistQuery(%q) = %q, %v", kept, got, err)
 	}
 
-	for _, in := range []string{"?", "identifier", "identifier=", "identifier=urn:x|1&status=", "identifier=%zz"} {
+	for _, in := range []string{"?", "identifier", "identifier=", "identifier=urn:x|1&status=", "identifier=%zz", "_count=1", "_sort=name&_count=1"} {
 		if _, err := IfNoneExistQuery(in); err == nil {
 			t.Errorf("IfNoneExistQuery(%q): want an error", in)
 		}
