@@ -46,4 +46,10 @@ func TestCreate_IfNoneExist(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("no value: want 400, got %d", w.Code)
 	}
+
+	w = doWithHeaders(t, h, http.MethodPost, "/fhir/r4/Patient", patient,
+		map[string]string{"If-None-Exist": " "})
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("blank: want 400, got %d", w.Code)
+	}
 }

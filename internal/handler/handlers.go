@@ -730,8 +730,9 @@ func (h *fhirHandler) create(w http.ResponseWriter, r *http.Request) {
 
 	// Conditional create (If-None-Exist): create only if no existing resource
 	// matches the query. One match → return it (200, no create); many → 412.
-	if ifne := strings.TrimSpace(r.Header.Get("If-None-Exist")); ifne != "" {
-		query, err := store.IfNoneExistQuery(ifne)
+	// A present but blank header gets a 400, not a plain create.
+	if ifne := r.Header.Values("If-None-Exist"); len(ifne) > 0 {
+		query, err := store.IfNoneExistQuery(ifne[0])
 		if err != nil {
 			operationOutcome(w, http.StatusBadRequest, "error", "invalid", err.Error())
 			return
