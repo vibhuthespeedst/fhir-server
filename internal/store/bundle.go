@@ -587,12 +587,15 @@ func (s *Store) conditionalMatch(ctx context.Context, resourceType, rawQuery str
 
 // IfNoneExistQuery returns the query of an If-None-Exist value. The spec form
 // is the bare query, but some clients send "?query", "Type?query" or a full
-// search URL, so anything up to the "?" is dropped. A value without criteria,
+// search URL, so anything up to the "?" is dropped. When the text before the
+// "?" starts with "name=", the "?" is part of a value instead, unless the name
+// has a "/" (a URL whose path holds an "="). A value without criteria,
 // or with a parameter that has no value, is an error: it would match nothing
 // and turn the conditional create into a plain create.
 func IfNoneExistQuery(value string) (string, error) {
 	value = strings.TrimSpace(value)
-	if before, after, found := strings.Cut(value, "?"); found && !strings.Contains(before, "=") {
+	before, after, found := strings.Cut(value, "?")
+	if name, _, isQuery := strings.Cut(before, "="); found && (!isQuery || strings.Contains(name, "/")) {
 		value = after
 	}
 	q, err := url.ParseQuery(value)

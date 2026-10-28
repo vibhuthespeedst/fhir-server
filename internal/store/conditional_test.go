@@ -24,10 +24,17 @@ func TestIfNoneExistQuery(t *testing.T) {
 		"?identifier=urn:x|1",
 		"DocumentReference?identifier=urn:x|1",
 		"http://localhost:9090/fhir/r4/DocumentReference?identifier=urn:x|1",
+		"http://x.com/y=z/DocumentReference?identifier=urn:x|1",
 	} {
 		if got, err := IfNoneExistQuery(in); err != nil || got != "identifier=urn:x|1" {
 			t.Errorf("IfNoneExistQuery(%q) = %q, %v", in, got, err)
 		}
+	}
+
+	// A "?" inside a value is not a prefix.
+	const kept = "identifier=urn:x|a?b"
+	if got, err := IfNoneExistQuery(kept); err != nil || got != kept {
+		t.Errorf("IfNoneExistQuery(%q) = %q, %v", kept, got, err)
 	}
 
 	for _, in := range []string{"?", "identifier", "identifier=", "identifier=urn:x|1&status=", "identifier=%zz"} {
