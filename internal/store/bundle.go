@@ -586,8 +586,9 @@ func (s *Store) conditionalMatch(ctx context.Context, resourceType, rawQuery str
 }
 
 // controlParams add no predicate in applyParam (_sort only orders), so a query
-// made of nothing else matches every resource of the type.
-var controlParams = []string{"_count", "_page", "_sort", "_include", "_revinclude", "_format", "_summary", "_elements", "_total", "_list"}
+// made of nothing else matches every resource of the type. _list is left out:
+// Search turns it into an _id filter first.
+var controlParams = []string{"_count", "_page", "_sort", "_include", "_revinclude", "_format", "_summary", "_elements", "_total"}
 
 // IfNoneExistQuery returns the query of an If-None-Exist value. The spec form
 // is the bare query, but some clients send "?query", "Type?query" or a full
