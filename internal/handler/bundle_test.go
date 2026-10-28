@@ -325,6 +325,18 @@ func TestBundle_RejectsEmptyIfNoneExist(t *testing.T) {
 	if called {
 		t.Error("ExecuteBundle must not run for an empty ifNoneExist")
 	}
+
+	// ifNoneExist only applies to a create; other entries ignore it.
+	resp = do(t, h, http.MethodPost, "/fhir/r4", map[string]any{
+		"resourceType": "Bundle",
+		"type":         "transaction",
+		"entry": []any{map[string]any{
+			"request": map[string]any{"method": "DELETE", "url": "Patient/1", "ifNoneExist": ""},
+		}},
+	})
+	if resp.Code != http.StatusOK || !called {
+		t.Fatalf("DELETE: status = %d, want 200; body=%s", resp.Code, resp.Body.String())
+	}
 }
 
 func TestBundle_TransactionErrorMapsStatus(t *testing.T) {
