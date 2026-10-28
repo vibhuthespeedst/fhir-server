@@ -39,7 +39,7 @@ func TestIfNoneExistQuery(t *testing.T) {
 		}
 	}
 
-	for _, in := range []string{"?", "identifier", "identifier=", "identifier=urn:x|1&status=", "identifier=%zz", "_count=1", "_sort=name&_count=1"} {
+	for _, in := range []string{"?", "identifier", "identifier=", "identifier=urn:x|1&status=", "identifier=%zz", "_count=1", "_sort=name&_count=1", "name=Smith,", "name=Smith,%20"} {
 		if _, err := IfNoneExistQuery(in); err == nil {
 			t.Errorf("IfNoneExistQuery(%q): want an error", in)
 		}

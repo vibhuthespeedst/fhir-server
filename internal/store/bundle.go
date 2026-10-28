@@ -610,8 +610,14 @@ func IfNoneExistQuery(value string) (string, error) {
 	}
 	criteria := false
 	for key, vals := range q {
-		if slices.Contains(vals, "") {
-			return "", fmt.Errorf("If-None-Exist parameter %q has no value", key)
+		// Search splits values on ","; a blank alternative ("name=Smith,") can
+		// match everything.
+		for _, v := range vals {
+			for _, alt := range strings.Split(v, ",") {
+				if strings.TrimSpace(alt) == "" {
+					return "", fmt.Errorf("If-None-Exist parameter %q has no value", key)
+				}
+			}
 		}
 		name, _, _ := strings.Cut(key, ":")
 		criteria = criteria || !slices.Contains(controlParams, name)
