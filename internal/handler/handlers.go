@@ -300,9 +300,24 @@ func parseIfMatchVersion(header string) (int, bool) {
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
+// rejectOperationID writes a 400 not-supported OperationOutcome when id is a
+// FHIR operation name (starts with "$") rather than a resource id, so unknown
+// instance-level operations are not treated as reads or writes of a resource.
+func rejectOperationID(w http.ResponseWriter, rt, id string) bool {
+	if !strings.HasPrefix(id, "$") {
+		return false
+	}
+	operationOutcome(w, http.StatusBadRequest, "error", "not-supported",
+		fmt.Sprintf("Operation %s is not supported on %s", id, rt))
+	return true
+}
+
 func (h *fhirHandler) read(w http.ResponseWriter, r *http.Request) {
 	rt := chi.URLParam(r, "resourceType")
 	id := chi.URLParam(r, "id")
+	if rejectOperationID(w, rt, id) {
+		return
+	}
 
 	resource, err := h.store.Read(r.Context(), rt, id)
 	if err != nil {
@@ -785,6 +800,9 @@ func (h *fhirHandler) create(w http.ResponseWriter, r *http.Request) {
 func (h *fhirHandler) update(w http.ResponseWriter, r *http.Request) {
 	rt := chi.URLParam(r, "resourceType")
 	id := chi.URLParam(r, "id")
+	if rejectOperationID(w, rt, id) {
+		return
+	}
 
 	if !requireFHIRContent(w, r) {
 		return
@@ -857,6 +875,9 @@ func (h *fhirHandler) update(w http.ResponseWriter, r *http.Request) {
 func (h *fhirHandler) patch(w http.ResponseWriter, r *http.Request) {
 	rt := chi.URLParam(r, "resourceType")
 	id := chi.URLParam(r, "id")
+	if rejectOperationID(w, rt, id) {
+		return
+	}
 
 	ct := strings.TrimSpace(strings.SplitN(r.Header.Get("Content-Type"), ";", 2)[0])
 
@@ -972,6 +993,9 @@ func (h *fhirHandler) xmlPatch(w http.ResponseWriter, r *http.Request, rt, id st
 func (h *fhirHandler) delete(w http.ResponseWriter, r *http.Request) {
 	rt := chi.URLParam(r, "resourceType")
 	id := chi.URLParam(r, "id")
+	if rejectOperationID(w, rt, id) {
+		return
+	}
 
 	if rt == "SearchParameter" {
 		_ = h.store.DeleteSearchParameter(r.Context(), id)
@@ -1772,6 +1796,13 @@ func (h *fhirHandler) compartmentSearch(w http.ResponseWriter, r *http.Request) 
 	ownerType := chi.URLParam(r, "resourceType")
 	ownerID := chi.URLParam(r, "id")
 	targetRT := chi.URLParam(r, "targetResourceType")
+	// Names starting with "$" are FHIR operations, not compartment resource types.
+	// Reject them here so unknown ops are not misreported as compartment errors.
+	if strings.HasPrefix(targetRT, "$") {
+		operationOutcome(w, http.StatusBadRequest, "error", "not-supported",
+			fmt.Sprintf("Operation %s is not supported on %s", targetRT, ownerType))
+		return
+	}
 
 	comp := compartment.Lookup(ownerType)
 	if comp == nil {
