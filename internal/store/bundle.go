@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -446,7 +447,11 @@ func (s *Store) planOps(ctx context.Context, baseURL string, entries []BundleEnt
 			}
 			// Conditional create (If-None-Exist): reuse an existing match if present.
 			if e.IfNoneExist != "" {
-				existingID, count, serr := s.conditionalMatch(ctx, rt, e.IfNoneExist)
+				query, qerr := IfNoneExistQuery(e.IfNoneExist)
+				if qerr != nil {
+					return nil, nil, &BundleError{HTTPStatus: 400, Code: "invalid", EntryIndex: i, Diagnostics: qerr.Error()}
+				}
+				existingID, count, serr := s.conditionalMatch(ctx, rt, query)
 				if serr != nil {
 					return nil, nil, &BundleError{HTTPStatus: 500, Code: "exception", EntryIndex: i, Diagnostics: serr.Error()}
 				}
@@ -578,6 +583,49 @@ func (s *Store) conditionalMatch(ctx context.Context, resourceType, rawQuery str
 		id, _ = result.Entries[0]["id"].(string)
 	}
 	return id, count, nil
+}
+
+// controlParams add no predicate in applyParam (_sort only orders), so a query
+// made of nothing else matches every resource of the type. _list is left out:
+// Search turns it into an _id filter first.
+var controlParams = []string{"_count", "_page", "_sort", "_include", "_revinclude", "_format", "_summary", "_elements", "_total"}
+
+// IfNoneExistQuery returns the query of an If-None-Exist value. The spec form
+// is the bare query, but some clients send "?query", "Type?query" or a full
+// search URL, so anything up to the "?" is dropped. When the text before the
+// "?" starts with "name=", the "?" is part of a value instead, unless the name
+// has a "/" (a URL whose path holds an "="). A value without criteria,
+// or with a parameter that has no value, is an error: it would match nothing
+// and turn the conditional create into a plain create. Control params like
+// _count are not criteria.
+func IfNoneExistQuery(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	before, after, found := strings.Cut(value, "?")
+	if name, _, isQuery := strings.Cut(before, "="); found && (!isQuery || strings.Contains(name, "/")) {
+		value = after
+	}
+	q, err := url.ParseQuery(value)
+	if err != nil {
+		return "", fmt.Errorf("invalid If-None-Exist %q: %v", value, err)
+	}
+	criteria := false
+	for key, vals := range q {
+		// Search splits values on ","; a blank alternative ("name=Smith,") can
+		// match everything.
+		for _, v := range vals {
+			for _, alt := range strings.Split(v, ",") {
+				if strings.TrimSpace(alt) == "" {
+					return "", fmt.Errorf("If-None-Exist parameter %q has no value", key)
+				}
+			}
+		}
+		name, _, _ := strings.Cut(key, ":")
+		criteria = criteria || !slices.Contains(controlParams, name)
+	}
+	if !criteria {
+		return "", fmt.Errorf("If-None-Exist has no search criteria")
+	}
+	return value, nil
 }
 
 // ─── URL / reference helpers ───────────────────────────────────────────────────
