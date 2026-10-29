@@ -1667,7 +1667,11 @@ func (b *queryBuilder) buildDateExists(param, value string) string {
 
 func (b *queryBuilder) buildNumberExists(param, value string) string {
 	prefix, numStr := extractComparatorPrefix(value)
-	f, _ := strconv.ParseFloat(numStr, 64)
+	f, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		b.err = &InvalidParamError{Msg: fmt.Sprintf("invalid number value %q for param %q", numStr, param)}
+		return "FALSE"
+	}
 	eps := math.Abs(f) * 1e-7
 	if eps == 0 {
 		eps = 1e-7
@@ -1766,7 +1770,11 @@ func (b *queryBuilder) buildQuantityExists(param, value string) string {
 		}
 	}
 	prefix, numStr := extractComparatorPrefix(numPart)
-	f, _ := strconv.ParseFloat(numStr, 64)
+	f, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		b.err = &InvalidParamError{Msg: fmt.Sprintf("invalid quantity value %q for param %q", numStr, param)}
+		return "FALSE"
+	}
 	eps := math.Abs(f) * 1e-7
 	if eps == 0 {
 		eps = 1e-7
