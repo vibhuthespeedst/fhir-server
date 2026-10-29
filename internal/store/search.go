@@ -504,8 +504,8 @@ func (b *queryBuilder) applyParam(rawKey, value string) {
 		b.addSort(value)
 	case "_filter":
 		b.applyFilter(value)
-	case "_count", "_page", "_include", "_revinclude", "_format", "_summary", "_elements", "_total", "_list":
-		// control params — handled at the HTTP layer
+	case "_count", "_page", "_include", "_revinclude", "_format", "_pretty", "_summary", "_elements", "_total", "_list":
+		// control params — handled at the HTTP layer (_pretty is ignored)
 	default:
 		b.applySearchParam(paramName, modifier, value)
 	}
