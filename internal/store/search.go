@@ -543,6 +543,14 @@ func (b *queryBuilder) applySearchParam(param, modifier, value string) {
 		return
 	}
 
+	// FHIR R4 search: empty parameters are ignored, not an error.
+	if value == "" {
+		switch b.resolvedParamType(param) {
+		case "number", "quantity":
+			return
+		}
+	}
+
 	// :not negates the match. :not-in is also negated (handled in buildTypedExists
 	// but needs to be NOT EXISTS at the applyParam level).
 	// suppressDirectDrive around the negated branches: a :not / :not-in predicate
@@ -1668,7 +1676,7 @@ func (b *queryBuilder) buildDateExists(param, value string) string {
 func (b *queryBuilder) buildNumberExists(param, value string) string {
 	prefix, numStr := extractComparatorPrefix(value)
 	f, err := strconv.ParseFloat(numStr, 64)
-	if err != nil {
+	if err != nil || math.IsInf(f, 0) || math.IsNaN(f) {
 		b.err = &InvalidParamError{Msg: fmt.Sprintf("invalid number value %q for param %q", numStr, param)}
 		return "FALSE"
 	}
@@ -1771,7 +1779,7 @@ func (b *queryBuilder) buildQuantityExists(param, value string) string {
 	}
 	prefix, numStr := extractComparatorPrefix(numPart)
 	f, err := strconv.ParseFloat(numStr, 64)
-	if err != nil {
+	if err != nil || math.IsInf(f, 0) || math.IsNaN(f) {
 		b.err = &InvalidParamError{Msg: fmt.Sprintf("invalid quantity value %q for param %q", numStr, param)}
 		return "FALSE"
 	}
@@ -2732,8 +2740,8 @@ func looksLikeDate(s string) bool {
 
 func looksLikeNumber(s string) bool {
 	_, rest := extractComparatorPrefix(s)
-	_, err := strconv.ParseFloat(rest, 64)
-	return err == nil
+	f, err := strconv.ParseFloat(rest, 64)
+	return err == nil && !math.IsInf(f, 0) && !math.IsNaN(f)
 }
 
 // FetchReferences returns resources linked to/from resourceID via sp_reference.
