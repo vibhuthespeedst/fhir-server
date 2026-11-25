@@ -95,6 +95,9 @@ func (s *Store) Search(ctx context.Context, sp SearchParams) (SearchResult, erro
 	if sp.Page <= 0 {
 		sp.Page = 1
 	}
+	if sp.Page > math.MaxInt/sp.PageSize {
+		return SearchResult{}, &InvalidParamError{Msg: fmt.Sprintf("_page %d is too large", sp.Page)}
+	}
 	offset := (sp.Page - 1) * sp.PageSize
 
 	// _list=<id>: resolve the named List resource and inject its entry IDs as
